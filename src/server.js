@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
 import { connectDatabase, closeDatabase } from './config/db.js';
+import errorHandler from './middleware/error.middleware.js';
 
 // Connect to database
 await connectDatabase();
@@ -26,6 +27,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // 📍 Routes will go here later
+
+
+// ... all your app.use('/api/...', routes) calls go here first ...
+
+app.use(errorHandler); // must be last
 
 const PORT = env.port;
 const server = app.listen(PORT, () => {

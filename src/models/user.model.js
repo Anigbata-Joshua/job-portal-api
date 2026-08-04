@@ -7,8 +7,8 @@ const UserSchema = new mongoose.Schema({
     role: { type: String, enum: ['job_seeker', 'employer', 'recruiter', 'admin'], default: 'job_seeker', },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', default: null, },
     profilePicture: { type: String, default: null, },
-    createdAt: { type: Date, default: Date.now, },
-});
+
+}, { timestamps: true });
 
 // ✅ Hash password before saving
 UserSchema.pre('save', async function () {
