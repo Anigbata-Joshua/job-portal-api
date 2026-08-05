@@ -16,8 +16,7 @@ export const register = asyncHandler(async (req, res) => {
     }
 
     // Only allow job_seeker or employer at registration.
-    // 'recruiter' is granted later by an employer inviting them to a company.
-    // 'admin' is never self-assignable.
+    
     const allowedSignupRoles = ['job_seeker', 'employer'];
     const assignedRole = allowedSignupRoles.includes(role) ? role : 'job_seeker';
 
