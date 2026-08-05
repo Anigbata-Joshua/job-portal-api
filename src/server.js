@@ -6,6 +6,8 @@ import errorHandler from './middleware/error.middleware.js';
 import adminRoutes from './routes/admin.route.js';
 import authRoutes from './routes/auth.route.js';
 import companyRoutes from './routes/company.route.js';
+import jobRoutes from './routes/job.route.js';
+
 
 // Connect to database
 await connectDatabase();
@@ -33,6 +35,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
+app.use('/api/jobs', jobRoutes);
 
 
 
