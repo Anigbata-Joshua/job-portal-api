@@ -18,6 +18,18 @@ export const scheduleInterview = asyncHandler(async (req, res) => {
         throw new ApiError(403, 'You do not have permission to schedule an interview for this application');
     }
 
+    // ⬇️ NEW: block a duplicate *active* interview for the same round
+    const existingActive = await Interview.findOne({
+        application: application._id,
+        round: round || 'screening',
+        status: 'scheduled',
+    });
+
+    if (existingActive) {
+        throw new ApiError(409, 'An active interview for this round has already been scheduled');
+    }
+    // ⬆️ NEW ends here
+
     const interview = await Interview.create({
         application: application._id,
         job: application.job,
@@ -32,9 +44,6 @@ export const scheduleInterview = asyncHandler(async (req, res) => {
         interviewers,
     });
 
-    // Move the application forward in the pipeline automatically —
-    // scheduling an interview is a meaningful status change worth
-    // recording in statusHistory, not just a side effect.
     application.status = 'interview';
     application.statusHistory.push({
         status: 'interview',

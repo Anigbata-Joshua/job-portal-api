@@ -9,6 +9,7 @@ import companyRoutes from './routes/company.route.js';
 import jobRoutes from './routes/job.route.js';
 import resumeRoutes from './routes/resume.route.js';
 import jobApplicationRoutes from './routes/jobApplication.route.js';
+import interviewRoutes from './routes/interview.route.js';
 
 
 
@@ -41,6 +42,7 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/applications', jobApplicationRoutes);
+app.use('/api/interviews', interviewRoutes)
 
 
 
