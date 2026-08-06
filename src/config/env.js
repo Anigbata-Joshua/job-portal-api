@@ -12,8 +12,12 @@ export const env = {
     //Server
     nodeEnv: process.env.NODE_ENV || "development",
     isProduction: process.env.NODE_ENV === "production",
-    port: parseInt(process.env.PORT || "6000", 10),
-
+    port: parseInt(process.env.PORT || "5000", 10),
+    
+    //Cloudinary
+    cloudinaryCloudName: required("CLOUDINARY_CLOUD_NAME"),
+    cloudinaryApiKey: required("CLOUDINARY_API_KEY"),
+    cloudinaryApiSecret: required("CLOUDINARY_API_SECRET"),
     //Uploads
     uploadPath: process.env.UPLOAD_PATH || 'uploads/',
     //Database
