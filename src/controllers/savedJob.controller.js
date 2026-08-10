@@ -13,10 +13,7 @@ export const saveJob = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Job not found');
     }
 
-    // Same pattern as applyToJob's duplicate check — the unique
-    // {user, job} index is the real safety net, but checking first
-    // lets us return a clean, specific error instead of a raw
-    // duplicate-key error bubbling up.
+    // Avoid duplicates of savedJobs
     const existing = await SavedJob.findOne({ user: req.user._id, job: jobId });
     if (existing) {
         throw new ApiError(409, 'Job is already saved');

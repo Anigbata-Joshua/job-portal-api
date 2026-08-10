@@ -3,7 +3,7 @@ import Job from '../models/job.model.js';
 import Resume from '../models/resume.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
-
+import createNotification from '../utils/createNotification.js';
 // @route   POST /api/applications
 // @access  Job Seeker only
 export const applyToJob = asyncHandler(async (req, res) => {
@@ -96,6 +96,14 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
     application.status = status;
     application.statusHistory.push({ status, changedBy: req.user._id, note });
     await application.save();
+
+        await createNotification({
+        user: application.applicant,
+        type: 'application_status_change',
+        templateArg: status,
+        relatedApplication: application._id,
+        relatedJob: application.job,
+    });
 
     res.status(200).json({ success: true, application });
 });

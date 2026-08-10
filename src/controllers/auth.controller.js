@@ -16,7 +16,6 @@ export const register = asyncHandler(async (req, res) => {
     }
 
     // Only allow job_seeker or employer at registration.
-    
     const allowedSignupRoles = ['job_seeker', 'employer'];
     const assignedRole = allowedSignupRoles.includes(role) ? role : 'job_seeker';
 

@@ -25,7 +25,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.id);
-    if (!user) {
+    if (!user) {cd
         throw new ApiError(401, 'User no longer exists');
     }
 

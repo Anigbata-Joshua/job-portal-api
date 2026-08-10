@@ -3,32 +3,36 @@ import Interview from '../models/interview.model.js';
 import JobApplication from '../models/job-application.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
-
+import createNotification from '../utils/createNotification.js';
 // @route   POST /api/interviews
 // @access  Employer/recruiter belonging to the application's company
 export const scheduleInterview = asyncHandler(async (req, res) => {
     const { applicationId, scheduledAt, duration, mode, location, round, interviewers } = req.body;
 
     const application = await JobApplication.findById(applicationId);
+    // Ensure the application actually exists
     if (!application) {
         throw new ApiError(404, 'Application not found');
     }
 
+    // Guard against a recruiter from one company scheduling an interview
+    // for an application that belongs to a different company
     if (!application.company.equals(req.user.companyId)) {
         throw new ApiError(403, 'You do not have permission to schedule an interview for this application');
     }
 
-    // ⬇️ NEW: block a duplicate *active* interview for the same round
+    // Block a duplicate *active* interview for the same round
     const existingActive = await Interview.findOne({
         application: application._id,
         round: round || 'screening',
         status: 'scheduled',
     });
 
+    // Prevent double-booking: if there's already a "scheduled" interview
+    // for this round, don't allow another one to be created
     if (existingActive) {
         throw new ApiError(409, 'An active interview for this round has already been scheduled');
     }
-    // ⬆️ NEW ends here
 
     const interview = await Interview.create({
         application: application._id,
@@ -52,6 +56,15 @@ export const scheduleInterview = asyncHandler(async (req, res) => {
     });
     await application.save();
 
+    // Create notification
+    await createNotification({
+        user: application.applicant,
+        type: 'interview_scheduled',
+        relatedApplication: application._id,
+        relatedInterview: interview._id,
+        relatedJob: application.job,
+    });
+
     res.status(201).json({ success: true, interview });
 });
 
@@ -69,6 +82,8 @@ export const getMyInterviews = asyncHandler(async (req, res) => {
 // @route   GET /api/interviews/company
 // @access  Employer/recruiter — all interviews for their company
 export const getCompanyInterviews = asyncHandler(async (req, res) => {
+    // A user without a companyId (e.g. not yet assigned/onboarded) has no
+    // company-scoped interviews to fetch, so reject early
     if (!req.user.companyId) {
         throw new ApiError(400, 'You do not belong to a company');
     }
@@ -87,15 +102,19 @@ export const updateInterviewStatus = asyncHandler(async (req, res) => {
     const { status } = req.body;
 
     const validStatuses = ['scheduled', 'completed', 'cancelled', 'rescheduled', 'no_show'];
+    // Reject any status value that isn't one of the allowed enum values,
+    // to keep the interview.status field from drifting out of sync with the schema
     if (!validStatuses.includes(status)) {
         throw new ApiError(400, 'Invalid status value');
     }
 
     const interview = await Interview.findById(req.params.id);
+    // Make sure the interview being updated actually exists
     if (!interview) {
         throw new ApiError(404, 'Interview not found');
     }
 
+    // Only allow recruiters/employers from the owning company to change status
     if (!interview.company.equals(req.user.companyId)) {
         throw new ApiError(403, 'You do not have permission to update this interview');
     }
@@ -112,10 +131,13 @@ export const submitFeedback = asyncHandler(async (req, res) => {
     const { rating, comments, recommendation } = req.body;
 
     const interview = await Interview.findById(req.params.id);
+    // Can't attach feedback to an interview that doesn't exist
     if (!interview) {
         throw new ApiError(404, 'Interview not found');
     }
 
+    // Restrict feedback submission to recruiters/employers belonging to
+    // the same company the interview was scheduled under
     if (!interview.company.equals(req.user.companyId)) {
         throw new ApiError(403, 'You do not have permission to submit feedback for this interview');
     }
