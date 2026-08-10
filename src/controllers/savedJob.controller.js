@@ -13,6 +13,10 @@ export const saveJob = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Job not found');
     }
 
+    if (job.status !== 'open') {
+        throw new ApiError(400, 'Cannot save a job that is not currently open');
+    }
+
     // Avoid duplicates of savedJobs
     const existing = await SavedJob.findOne({ user: req.user._id, job: jobId });
     if (existing) {

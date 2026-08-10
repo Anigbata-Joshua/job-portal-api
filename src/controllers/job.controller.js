@@ -26,7 +26,7 @@ export const createJob = asyncHandler(async (req, res) => {
     const existing = await Job.findOne({
         postedBy: req.user._id,
         title: req.body.title,
-        company: req.body.company,
+        company: company._id,
     });
     if (existing) {
         throw new ApiError(409, 'You already have a job with this title at this company.');

@@ -4,15 +4,33 @@ import { env } from '../config/env.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 
+const parseCookies = (cookieHeader) => {
+    const list = {};
+    if (!cookieHeader) return list;
+    cookieHeader.split(';').forEach((cookie) => {
+        const parts = cookie.split('=');
+        list[parts.shift().trim()] = decodeURI(parts.join('='));
+    });
+    return list;
+};
+
 // Verifies the JWT access token and attaches the user to req.user
 export const authenticate = asyncHandler(async (req, res, next) => {
-    const authHeader = req.headers.authorization;
+    let token = null;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new ApiError(401, 'No token provided, authorization denied');
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    } else if (req.headers.cookie) {
+        const cookies = parseCookies(req.headers.cookie);
+        if (cookies.accessToken) {
+            token = cookies.accessToken;
+        }
     }
 
-    const token = authHeader.split(' ')[1];
+    if (!token) {
+        throw new ApiError(401, 'No token provided, authorization denied');
+    }
 
     let decoded;
     try {
@@ -25,7 +43,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.id);
-    if (!user) {cd
+    if (!user) {
         throw new ApiError(401, 'User no longer exists');
     }
 

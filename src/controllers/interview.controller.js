@@ -1,9 +1,12 @@
 // controllers/interview.controller.js
+import mongoose from 'mongoose';
 import Interview from '../models/interview.model.js';
 import JobApplication from '../models/job-application.model.js';
+import User from '../models/user.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import createNotification from '../utils/createNotification.js';
+
 // @route   POST /api/interviews
 // @access  Employer/recruiter belonging to the application's company
 export const scheduleInterview = asyncHandler(async (req, res) => {
@@ -21,6 +24,56 @@ export const scheduleInterview = asyncHandler(async (req, res) => {
         throw new ApiError(403, 'You do not have permission to schedule an interview for this application');
     }
 
+    // Check if the application is inactive (withdrawn or rejected)
+    if (['withdrawn', 'rejected'].includes(application.status)) {
+        throw new ApiError(400, `Cannot schedule interview for a ${application.status} application`);
+    }
+
+    // Validate that all interviewers exist
+    if (interviewers && interviewers.length > 0) {
+        const uniqueInterviewers = [...new Set(interviewers)];
+        const count = await User.countDocuments({ _id: { $in: uniqueInterviewers } });
+        if (count !== uniqueInterviewers.length) {
+            throw new ApiError(400, 'One or more interviewer IDs are invalid');
+        }
+    }
+
+    const scheduledDate = new Date(scheduledAt);
+    const durationMinutes = duration || 30;
+    const endDate = new Date(scheduledDate.getTime() + durationMinutes * 60 * 1000);
+
+    // Check for candidate scheduling conflicts
+    const candidateCollision = await Interview.findOne({
+        candidate: application.applicant,
+        status: 'scheduled',
+        $expr: {
+            $and: [
+                { $lt: ['$scheduledAt', endDate] },
+                { $gt: [{ $add: ['$scheduledAt', { $multiply: ['$duration', 60000] }] }, scheduledDate] }
+            ]
+        }
+    });
+    if (candidateCollision) {
+        throw new ApiError(409, 'Candidate has an overlapping interview scheduled during this slot');
+    }
+
+    // Check for interviewer scheduling conflicts
+    if (interviewers && interviewers.length > 0) {
+        const interviewerCollision = await Interview.findOne({
+            interviewers: { $in: interviewers },
+            status: 'scheduled',
+            $expr: {
+                $and: [
+                    { $lt: ['$scheduledAt', endDate] },
+                    { $gt: [{ $add: ['$scheduledAt', { $multiply: ['$duration', 60000] }] }, scheduledDate] }
+                ]
+            }
+        });
+        if (interviewerCollision) {
+            throw new ApiError(409, 'One or more interviewers have an overlapping interview scheduled during this slot');
+        }
+    }
+
     // Block a duplicate *active* interview for the same round
     const existingActive = await Interview.findOne({
         application: application._id,
@@ -34,38 +87,51 @@ export const scheduleInterview = asyncHandler(async (req, res) => {
         throw new ApiError(409, 'An active interview for this round has already been scheduled');
     }
 
-    const interview = await Interview.create({
-        application: application._id,
-        job: application.job,
-        candidate: application.applicant,
-        company: application.company,
-        scheduledBy: req.user._id,
-        scheduledAt,
-        duration,
-        mode,
-        location,
-        round,
-        interviewers,
-    });
+    // Transaction execution
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    application.status = 'interview';
-    application.statusHistory.push({
-        status: 'interview',
-        changedBy: req.user._id,
-        note: `Interview scheduled (${round || 'screening'} round)`,
-    });
-    await application.save();
+    try {
+        const [interview] = await Interview.create([{
+            application: application._id,
+            job: application.job,
+            candidate: application.applicant,
+            company: application.company,
+            scheduledBy: req.user._id,
+            scheduledAt: scheduledDate,
+            duration: durationMinutes,
+            mode,
+            location,
+            round,
+            interviewers,
+        }], { session });
 
-    // Create notification
-    await createNotification({
-        user: application.applicant,
-        type: 'interview_scheduled',
-        relatedApplication: application._id,
-        relatedInterview: interview._id,
-        relatedJob: application.job,
-    });
+        application.status = 'interview';
+        application.statusHistory.push({
+            status: 'interview',
+            changedBy: req.user._id,
+            note: `Interview scheduled (${round || 'screening'} round)`,
+        });
+        await application.save({ session });
 
-    res.status(201).json({ success: true, interview });
+        // Create notification
+        await createNotification({
+            user: application.applicant,
+            type: 'interview_scheduled',
+            relatedApplication: application._id,
+            relatedInterview: interview._id,
+            relatedJob: application.job,
+        });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        res.status(201).json({ success: true, interview });
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
 });
 
 // @route   GET /api/interviews/my

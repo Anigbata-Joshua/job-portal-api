@@ -29,7 +29,11 @@ export async function connectDatabase() {
         await mongoose.connect(env.mongoUri, options);
     } catch (error) {
         console.error('❌ Critical: Initial connection failed ->', error.message);
-        process.exit(1);
+        if (env.nodeEnv !== 'test') {
+            process.exit(1);
+        } else {
+            throw error;
+        }
     }
 }
 

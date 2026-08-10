@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import { connectDatabase, closeDatabase } from './config/db.js';
 import errorHandler from './middleware/error.middleware.js';
@@ -11,8 +13,21 @@ import resumeRoutes from './routes/resume.route.js';
 import jobApplicationRoutes from './routes/jobApplication.route.js';
 import interviewRoutes from './routes/interview.route.js';
 import savedJobRoutes from './routes/savedJob.route.js';
-import notificationRoutes from './routes/notification.route.js'
+import notificationRoutes from './routes/notification.route.js';
+import { sanitizeBody } from './utils/sanitize.js';
 
+// Global Uncaught Error Listeners
+const handleFatalError = async (err, type) => {
+    console.error(`❌ ${type}! Shutting down gracefully...`, err);
+    try {
+        await closeDatabase();
+    } catch (dbErr) {
+        console.error('Failed to close DB on crash:', dbErr.message);
+    }
+    process.exit(1);
+};
+process.on('uncaughtException', (err) => handleFatalError(err, 'UNCAUGHT EXCEPTION'));
+process.on('unhandledRejection', (err) => handleFatalError(err, 'UNHANDLED REJECTION'));
 
 // Connect to database
 await connectDatabase();
@@ -20,11 +35,27 @@ await connectDatabase();
 const app = express();
 
 // Middleware
+app.use(helmet());
 app.use(cors({
     origin: env.corsOrigins.length > 0 ? env.corsOrigins : env.frontendURI,
     credentials: true,
 }));
+
+// Rate limiting on authentication routes
+const authLimiter = rateLimit({
+    windowMs: env.rateLimit,
+    max: env.rateLimitMax,
+    message: {
+        success: false,
+        message: 'Too many requests from this IP, please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/auth', authLimiter);
+
 app.use(express.json());
+app.use(sanitizeBody);
 
 // Test route
 app.get('/api/health', (req, res) => {

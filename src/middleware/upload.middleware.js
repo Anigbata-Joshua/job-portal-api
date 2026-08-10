@@ -17,7 +17,7 @@ const fileFilter = (req, file, cb) => {
         file.originalname.toLowerCase().endsWith(ext)
     );
 
-    if (hasValidMime || hasValidExtension) {
+    if (hasValidMime && hasValidExtension) {
         cb(null, true);
     } else {
         cb(new Error('Only PDF and Word documents are allowed'), false);

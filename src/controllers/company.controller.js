@@ -10,7 +10,10 @@ export const createCompany = asyncHandler(async (req, res) => {
     const { name, description, website, industry, size, logo } = req.body;
 
     // Enforce "one company per user" for this MVP. We look up whether a
-    // company already exists with this user as its creator.
+    // company already exists with this user as its creator or if user is already linked.
+    if (req.user.companyId) {
+        throw new ApiError(400, 'You are already associated with a company');
+    }
     const existing = await Company.findOne({ createdBy: req.user._id });
     if (existing) {
         throw new ApiError(409, 'You already have a company registered');
@@ -31,9 +34,11 @@ export const createCompany = asyncHandler(async (req, res) => {
     });
 
     // Business rule: creating a company automatically promotes the user
-    // from 'job_seeker' to 'employer', and links them to the new company.
+    // from 'job_seeker' to 'employer' (if they are not admin), and links them to the new company.
     // This is the "role upgrade" logic referenced back in seed.js.
-    req.user.role = 'employer';
+    if (req.user.role !== 'admin') {
+        req.user.role = 'employer';
+    }
     req.user.companyId = company._id;
     await req.user.save();
 
@@ -122,6 +127,14 @@ export const addRecruiter = asyncHandler(async (req, res) => {
     const userToAdd = await User.findById(userId);
     if (!userToAdd) {
         throw new ApiError(404, 'User not found');
+    }
+
+    // Prevent demoting an Admin or hijacking users associated with other companies
+    if (userToAdd.role === 'admin') {
+        throw new ApiError(400, 'Cannot reassign an Administrator to a recruiter role');
+    }
+    if (userToAdd.companyId && !userToAdd.companyId.equals(company._id)) {
+        throw new ApiError(400, 'User is already associated with another company');
     }
 
     // Prevent adding the same person as a recruiter twice.

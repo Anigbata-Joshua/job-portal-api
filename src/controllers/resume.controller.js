@@ -5,6 +5,16 @@ import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import uploadToCloudinary from '../utils/uploadToCloudinary.js';
 
+// Helper to extract the Cloudinary public ID from raw URL
+const getPublicIdFromUrl = (url) => {
+    const parts = url.split('/upload/');
+    if (parts.length < 2) return null;
+    const subParts = parts[1].split('/');
+    if (subParts.length < 2) return null;
+    // The version part is subParts[0], public_id is everything after that
+    return subParts.slice(1).join('/');
+};
+
 // @route   POST /api/resumes
 // @access  Job Seeker only
 export const createResume = asyncHandler(async (req, res) => {
@@ -13,35 +23,52 @@ export const createResume = asyncHandler(async (req, res) => {
     }
 
     const { title, summary, skills, isDefault } = req.body;
+    if (!title) {
+        throw new ApiError(400, 'Please provide a resume title');
+    }
 
     const uploadResult = await uploadToCloudinary(req.file.buffer);
 
-    // Determine file type from the original filename extension.
-    const extension = req.file.originalname.split('.').pop().toLowerCase();
-    const fileType = extension === 'pdf' ? 'pdf' : extension === 'docx' ? 'docx' : 'doc';
+    let resume;
+    try {
+        // Determine file type from the original filename extension.
+        const extension = req.file.originalname.split('.').pop().toLowerCase();
+        const fileType = extension === 'pdf' ? 'pdf' : extension === 'docx' ? 'docx' : 'doc';
 
-    // If this new resume is being set as default, unset any existing
-    // default first — the schema doesn't enforce "only one default"
-    // on its own, so this has to happen at the controller level.
-    if (isDefault === 'true' || isDefault === true) {
-        await Resume.updateMany({ user: req.user._id }, { isDefault: false });
+        // If this new resume is being set as default, unset any existing
+        // default first — the schema doesn't enforce "only one default"
+        // on its own, so this has to happen at the controller level.
+        if (isDefault === 'true' || isDefault === true) {
+            await Resume.updateMany({ user: req.user._id }, { isDefault: false });
+        }
+
+        // If this is the user's very first resume, make it default automatically,
+        // regardless of what was sent — a user should never end up with zero
+        // default resumes.
+        const existingCount = await Resume.countDocuments({ user: req.user._id });
+
+        resume = await Resume.create({
+            user: req.user._id,
+            title,
+            fileUrl: uploadResult.secure_url,
+            fileName: req.file.originalname,
+            fileType,
+            isDefault: existingCount === 0 ? true : (isDefault === 'true' || isDefault === true),
+            summary,
+            skills: skills ? skills.split(',').map((s) => s.trim()) : [],
+        });
+    } catch (error) {
+        // Clean up Cloudinary asset if Mongoose document creation fails
+        if (uploadResult && uploadResult.public_id) {
+            await cloudinary.uploader.destroy(uploadResult.public_id, { resource_type: 'raw' });
+        } else if (uploadResult && uploadResult.secure_url) {
+            const publicId = getPublicIdFromUrl(uploadResult.secure_url);
+            if (publicId) {
+                await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+            }
+        }
+        throw error;
     }
-
-    // If this is the user's very first resume, make it default automatically,
-    // regardless of what was sent — a user should never end up with zero
-    // default resumes.
-    const existingCount = await Resume.countDocuments({ user: req.user._id });
-
-    const resume = await Resume.create({
-        user: req.user._id,
-        title,
-        fileUrl: uploadResult.secure_url,
-        fileName: req.file.originalname,
-        fileType,
-        isDefault: existingCount === 0 ? true : (isDefault === 'true' || isDefault === true),
-        summary,
-        skills: skills ? skills.split(',').map((s) => s.trim()) : [],
-    });
 
     res.status(201).json({ success: true, resume });
 });
@@ -82,6 +109,16 @@ export const deleteResume = asyncHandler(async (req, res) => {
 
     if (!resume.user.equals(req.user._id)) {
         throw new ApiError(403, 'You can only delete your own resumes');
+    }
+
+    // Delete the file from Cloudinary
+    const publicId = getPublicIdFromUrl(resume.fileUrl);
+    if (publicId) {
+        try {
+            await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+        } catch (cloudinaryError) {
+            console.error('Cloudinary deletion failed:', cloudinaryError.message);
+        }
     }
 
     await resume.deleteOne();

@@ -37,8 +37,7 @@ export const applyToJob = asyncHandler(async (req, res) => {
         statusHistory: [{ status: 'applied', changedBy: req.user._id }],
     });
 
-    job.applicationsCount += 1;
-    await job.save();
+    await Job.findByIdAndUpdate(job._id, { $inc: { applicationsCount: 1 } });
 
     res.status(201).json({ success: true, application });
 });
