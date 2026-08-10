@@ -1,0 +1,1064 @@
+{
+  "info": {
+    "_postman_id": "job-portal-api-collection",
+    "name": "Job Portal API Remediation & Scrutiny Testing Suite",
+    "description": "Comprehensive testing suite for all endpoints, including security validation, XSS sanitization, Refresh Token Rotation, concurrency counters, scheduling conflict gates, and RBAC edge cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register (Seeker)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane.seeker@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"role\": \"job_seeker\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/auth/register",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Register a new job seeker. Expects 201 Created and HttpOnly cookies."
+          }
+        },
+        {
+          "name": "Register (Employer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Corporate\",\n  \"email\": \"john.employer@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"role\": \"employer\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/auth/register",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Register a new employer."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.accessToken) {",
+                  "        pm.environment.set(\"accessToken\", jsonData.accessToken);",
+                  "    }",
+                  "    if (jsonData.refreshToken) {",
+                  "        pm.environment.set(\"refreshToken\", jsonData.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jane.seeker@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/auth/login",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Log in to the system. Automatically sets environment tokens upon success."
+          }
+        },
+        {
+          "name": "Refresh Token Rotation (RTR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.accessToken) {",
+                  "        pm.environment.set(\"accessToken\", jsonData.accessToken);",
+                  "    }",
+                  "    if (jsonData.refreshToken) {",
+                  "        pm.environment.set(\"refreshToken\", jsonData.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/auth/refresh",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Rotates refresh token. Send previous refreshToken. If reused, all sessions are automatically revoked."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/auth/logout",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Clears cookies and invalidates refresh token in the DB."
+          }
+        },
+        {
+          "name": "EDGE CASE: Weak Password Register Attempt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bad Password Seeker\",\n  \"email\": \"bad.seeker@example.com\",\n  \"password\": \"123456\",\n  \"role\": \"job_seeker\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/auth/register",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Checks the Zod validation and password complexity. Expects 400 Bad Request."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Companies",
+      "item": [
+        {
+          "name": "Create Company",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Google Inc\",\n  \"description\": \"Search and tech conglomerate corporate headquarters.\",\n  \"website\": \"https://google.com\",\n  \"industry\": \"Technology\",\n  \"size\": \"500+\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/companies",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "companies"
+              ]
+            },
+            "description": "Register a new company under logged-in employer."
+          }
+        },
+        {
+          "name": "Get Company Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/companies/:id",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ENTER_COMPANY_ID_HERE"
+                }
+              ]
+            },
+            "description": "Public company profile retrieval."
+          }
+        },
+        {
+          "name": "Update Company Details",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Google Search, Ads, and cloud services provider globally.\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/companies/:id",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ENTER_COMPANY_ID_HERE"
+                }
+              ]
+            },
+            "description": "Updates company fields. Validates ownership."
+          }
+        },
+        {
+          "name": "Add Recruiter",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"ENTER_SEEKER_USER_ID_TO_PROMOTE\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/companies/:id/recruiters",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "recruiters"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ENTER_COMPANY_ID_HERE"
+                }
+              ]
+            },
+            "description": "Promotes a job seeker to recruiter for this company."
+          }
+        },
+        {
+          "name": "EDGE CASE: Add Recruiter Hijack/Demotion Attempt",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"ENTER_ADMIN_USER_ID\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/companies/:id/recruiters",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "recruiters"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ENTER_COMPANY_ID_HERE"
+                }
+              ]
+            },
+            "description": "Tries to demote an Admin to a recruiter. Expects 400 Bad Request."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Jobs",
+      "item": [
+        {
+          "name": "Create Job",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Backend Node Developer\",\n  \"description\": \"Write high performance secure microservices and maintain MongoDB databases.\",\n  \"requirements\": [\"Node.js\", \"Express\", \"MongoDB\"],\n  \"responsibilities\": [\"Scale APIs\", \"Improve DB indexes\"],\n  \"location\": \"Lagos, Nigeria\",\n  \"workMode\": \"remote\",\n  \"employmentType\": \"full-time\",\n  \"experienceLevel\": \"senior\",\n  \"skills\": [\"JavaScript\", \"Mongoose\"],\n  \"status\": \"open\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/jobs",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            },
+            "description": "Post a new job. Must belong to a verified company."
+          }
+        },
+        {
+          "name": "EDGE CASE: Create Duplicate Job Blocker",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Backend Node Developer\",\n  \"description\": \"Write high performance secure microservices and maintain MongoDB databases.\",\n  \"requirements\": [\"Node.js\", \"Express\", \"MongoDB\"],\n  \"responsibilities\": [\"Scale APIs\", \"Improve DB indexes\"],\n  \"location\": \"Lagos, Nigeria\",\n  \"workMode\": \"remote\",\n  \"employmentType\": \"full-time\",\n  \"experienceLevel\": \"senior\",\n  \"skills\": [\"JavaScript\", \"Mongoose\"],\n  \"status\": \"open\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/jobs",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            },
+            "description": "Send identical duplicate job post again. Expects 409 Conflict."
+          }
+        },
+        {
+          "name": "Get Jobs Feed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/jobs?workMode=remote&experienceLevel=senior",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ],
+              "query": [
+                {
+                  "key": "workMode",
+                  "value": "remote"
+                },
+                {
+                  "key": "experienceLevel",
+                  "value": "senior"
+                }
+              ]
+            },
+            "description": "Fetches active jobs with query filtering."
+          }
+        },
+        {
+          "name": "Get Job Profile by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/jobs/:id",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ENTER_JOB_ID_HERE"
+                }
+              ]
+            },
+            "description": "Retrieves details of a single job listing."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Resumes",
+      "item": [
+        {
+          "name": "Upload Resume",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "Senior Backend Resume",
+                  "type": "text"
+                },
+                {
+                  "key": "summary",
+                  "value": "5 years experience scaling NodeJS APIs",
+                  "type": "text"
+                },
+                {
+                  "key": "isDefault",
+                  "value": "true",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{url}}/api/resumes",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "resumes"
+              ]
+            },
+            "description": "Upload a PDF/DOCX resume file (form-data)."
+          }
+        },
+        {
+          "name": "EDGE CASE: Upload Spoofed File (EXE)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "Spoofed Resume",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{url}}/api/resumes",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "resumes"
+              ]
+            },
+            "description": "Attaching a payload.exe with content-type spoofed as application/pdf. Expects 500/400 validation rejection."
+          }
+        },
+        {
+          "name": "Get My Resumes",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/resumes/my",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                "my"
+              ]
+            },
+            "description": "Fetches all uploaded resumes for logged-in seeker."
+          }
+        },
+        {
+          "name": "Delete Resume",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/resumes/:id",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ENTER_RESUME_ID_HERE"
+                }
+              ]
+            },
+            "description": "Deletes the resume document and triggers Cloudinary api destruction."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Job Applications",
+      "item": [
+        {
+          "name": "Apply to Job",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"ENTER_JOB_ID_HERE\",\n  \"resumeId\": \"ENTER_RESUME_ID_HERE\",\n  \"coverLetter\": \"Dear hiring manager, I am very interested in this node backend developer role.\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/applications",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "applications"
+              ]
+            },
+            "description": "Apply to a job listing. Increments count atomically in DB."
+          }
+        },
+        {
+          "name": "EDGE CASE: Double Application Gate",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"ENTER_JOB_ID_HERE\",\n  \"resumeId\": \"ENTER_RESUME_ID_HERE\",\n  \"coverLetter\": \"Duplicated application attempt\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/applications",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "applications"
+              ]
+            },
+            "description": "Apply again to the same job. Expects 409 Conflict."
+          }
+        },
+        {
+          "name": "Get Application Candidates for Job",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/applications/job/:jobId",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "applications",
+                "job",
+                ":jobId"
+              ],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "ENTER_JOB_ID_HERE"
+                }
+              ]
+            },
+            "description": "Allows employers to view candidates."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Interviews",
+      "item": [
+        {
+          "name": "Schedule Interview",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"ENTER_APPLICATION_ID_HERE\",\n  \"scheduledAt\": \"2026-09-12T10:00:00.000Z\",\n  \"duration\": 45,\n  \"mode\": \"video\",\n  \"location\": \"https://meet.google.com/abc-defg-hij\",\n  \"round\": \"technical\",\n  \"interviewers\": [\"ENTER_RECRUITER_USER_ID_HERE\"]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/interviews",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "interviews"
+              ]
+            },
+            "description": "Schedules an interview within a transaction block. Checks schedule conflicts."
+          }
+        },
+        {
+          "name": "EDGE CASE: Schedule Collision Double Booking Gate",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"ENTER_DIFFERENT_APPLICATION_ID_HERE\",\n  \"scheduledAt\": \"2026-09-12T10:15:00.000Z\",\n  \"duration\": 30,\n  \"mode\": \"video\",\n  \"location\": \"https://meet.google.com/conflict-meeting\",\n  \"round\": \"hr\",\n  \"interviewers\": [\"ENTER_RECRUITER_USER_ID_HERE\"]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/interviews",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "interviews"
+              ]
+            },
+            "description": "Tries to book an overlapping interview for candidate or interviewer. Expects 409 Conflict."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Saved Jobs",
+      "item": [
+        {
+          "name": "Save Job",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"ENTER_JOB_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/saved-jobs",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "saved-jobs"
+              ]
+            },
+            "description": "Saves job for seeker. Enforces 'open' status validation."
+          }
+        },
+        {
+          "name": "EDGE CASE: Save Inactive/Draft Job Gate",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"ENTER_DRAFT_OR_CLOSED_JOB_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/api/saved-jobs",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "saved-jobs"
+              ]
+            },
+            "description": "Attempts to save a draft or closed job listing. Expects 400 Bad Request."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Admin Verification",
+      "item": [
+        {
+          "name": "Get Pending Verification Companies",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/admin/companies/pending",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "companies",
+                "pending"
+              ]
+            },
+            "description": "Fetch list of unverified companies. Admin only."
+          }
+        },
+        {
+          "name": "Verify Company",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/admin/companies/:id/verify",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "companies",
+                "id",
+                "verify"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ENTER_COMPANY_ID_HERE"
+                }
+              ]
+            },
+            "description": "Verifies the company allowing them to post jobs. Admin only."
+          }
+        }
+      ]
+    }
+  ]
+}
