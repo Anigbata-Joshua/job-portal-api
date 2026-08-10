@@ -74,12 +74,18 @@ npm install
 
 ### 2. Configure Environment Variables
 Create a `.env` file in the root directory:
-```env
+
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/job_portal
-JWT_SECRET=your_jwt_access_secret_key
+MONGODB_URI=mongodb://localhost:27017/job_portal
+JWT_ACCESS_SECRET=your_jwt_access_secret_key
 JWT_REFRESH_SECRET=your_jwt_refresh_secret_key
 NODE_ENV=development
+
+# Also required by env.js — worth adding these too, since they're
+# not optional (Cloudinary uses required() as well):
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 ### 3. Run Development Server

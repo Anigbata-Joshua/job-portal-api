@@ -6,7 +6,9 @@ import ApiError from '../utils/ApiError.js';
 
 const parseCookies = (cookieHeader) => {
     const list = {};
+
     if (!cookieHeader) return list;
+
     cookieHeader.split(';').forEach((cookie) => {
         const parts = cookie.split('=');
         list[parts.shift().trim()] = decodeURI(parts.join('='));
@@ -35,6 +37,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     let decoded;
     try {
         decoded = jwt.verify(token, env.jwtAccessSecret);
+        
     } catch (err) {
         if (err.name === 'TokenExpiredError') {
             throw new ApiError(401, 'Access token expired');

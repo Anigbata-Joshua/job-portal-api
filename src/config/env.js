@@ -9,6 +9,7 @@ const required = (key, fallback = undefined) => {
 };
 
 export const env = {
+    
     //Server
     nodeEnv: process.env.NODE_ENV || "development",
     isProduction: process.env.NODE_ENV === "production",
@@ -18,8 +19,10 @@ export const env = {
     cloudinaryCloudName: required("CLOUDINARY_CLOUD_NAME"),
     cloudinaryApiKey: required("CLOUDINARY_API_KEY"),
     cloudinaryApiSecret: required("CLOUDINARY_API_SECRET"),
+
     //Uploads
     uploadPath: process.env.UPLOAD_PATH || 'uploads/',
+
     //Database
     mongoUri: required("MONGODB_URI"),
 
