@@ -1059,6 +1059,98 @@
           }
         }
       ]
+    },
+    {
+      "name": "9. Reports",
+      "item": [
+        {
+          "name": "Get Seeker Report",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/reports/seeker",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "seeker"
+              ]
+            },
+            "description": "Retrieve stats and applications status breakdown. Job Seeker only."
+          }
+        },
+        {
+          "name": "Get Employer Report",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/reports/employer",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "employer"
+              ]
+            },
+            "description": "Retrieve jobs, applications, and interviews overview. Employer/Recruiter only."
+          }
+        },
+        {
+          "name": "Get Admin Report",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/api/reports/admin",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "admin"
+              ]
+            },
+            "description": "Retrieve total users, jobs, applications, and companies platform-wide. Admin only."
+          }
+        }
+      ]
     }
   ]
 }

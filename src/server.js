@@ -14,6 +14,7 @@ import jobApplicationRoutes from './routes/jobApplication.route.js';
 import interviewRoutes from './routes/interview.route.js';
 import savedJobRoutes from './routes/savedJob.route.js';
 import notificationRoutes from './routes/notification.route.js';
+import reportRoutes from './routes/report.route.js';
 import { sanitizeBody } from './utils/sanitize.js';
 
 // Global Uncaught Error Listeners
@@ -77,6 +78,7 @@ app.use('/api/applications', jobApplicationRoutes);
 app.use('/api/interviews', interviewRoutes);
 app.use('/api/saved-jobs', savedJobRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/reports', reportRoutes);
 
 
 
