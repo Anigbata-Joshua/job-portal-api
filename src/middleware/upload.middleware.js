@@ -1,4 +1,5 @@
 import multer from 'multer';
+import ApiError from '../utils/ApiError.js';
 
 // Store the file in memory temporarily, as a buffer — we don't want it
 // saved to local disk, since we're streaming it straight to Cloudinary.
@@ -17,10 +18,10 @@ const fileFilter = (req, file, cb) => {
         file.originalname.toLowerCase().endsWith(ext)
     );
 
-    if (hasValidMime && hasValidExtension) {
+    if (hasValidMime || hasValidExtension) {
         cb(null, true);
     } else {
-        cb(new Error('Only PDF and Word documents are allowed'), false);
+        cb(new ApiError(400, 'Only PDF and Word documents are allowed'), false);
     }
 };
 

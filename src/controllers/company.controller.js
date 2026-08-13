@@ -11,13 +11,20 @@ export const createCompany = asyncHandler(async (req, res) => {
 
     // Enforce "one company per user" for this MVP. We look up whether a
     // company already exists with this user as its creator or if user is already linked.
-    if (req.user.companyId) {
+if (req.user.companyId) {
+    const existingCompany = await Company.findById(req.user.companyId);
+    if (existingCompany) {
         throw new ApiError(400, 'You are already associated with a company');
     }
-    const existing = await Company.findOne({ createdBy: req.user._id });
-    if (existing) {
-        throw new ApiError(409, 'You already have a company registered');
-    }
+    // companyId points to a deleted company — clear the stale reference
+    // and allow this user to create a new one.
+    req.user.companyId = null;
+}
+
+const existing = await Company.findOne({ createdBy: req.user._id });
+if (existing) {
+    throw new ApiError(409, 'You already have a company registered');
+}
 
     // Create the new Company document.
     const company = await Company.create({

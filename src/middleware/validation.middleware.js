@@ -8,7 +8,7 @@ export const validate = (schema) => (req, res, next) => {
         next();
     } catch (err) {
         if (err instanceof z.ZodError) {
-            const errorMessages = err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+            const errorMessages = err.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
             return next(new ApiError(400, errorMessages));
         }
         next(err);
@@ -75,4 +75,26 @@ export const scheduleInterviewSchema = z.object({
     location: z.string().min(1, 'Location or link is required'),
     round: z.enum(['screening', 'technical', 'hr', 'final']).optional(),
     interviewers: z.array(objectIdSchema).optional(),
+});
+
+export const applyToJobSchema = z.object({
+    jobId: objectIdSchema,
+    resumeId: objectIdSchema,
+    coverLetter: z.string().max(2000, 'Cover letter is too long').optional(),
+});
+
+export const updateApplicationStatusSchema = z.object({
+    status: z.enum(['applied', 'under_review', 'shortlisted', 'interview', 'offered', 'rejected', 'withdrawn']),
+    note: z.string().max(500, 'Note is too long').optional(),
+});
+
+export const saveJobSchema = z.object({
+    jobId: objectIdSchema,
+});
+
+export const createResumeSchema = z.object({
+    title: z.string().min(1, 'Resume title is required'),
+    summary: z.string().max(1000, 'Summary is too long').optional(),
+    skills: z.string().optional(), // comma-separated string from form-data, not an array
+    isDefault: z.string().optional(), // form-data sends booleans as strings ("true"/"false")
 });

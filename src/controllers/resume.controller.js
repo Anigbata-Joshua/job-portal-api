@@ -4,6 +4,7 @@ import cloudinary from '../config/cloudinary.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import uploadToCloudinary from '../utils/uploadToCloudinary.js';
+import crypto from 'crypto';
 
 // Helper to extract the Cloudinary public ID from raw URL
 const getPublicIdFromUrl = (url) => {
@@ -25,6 +26,27 @@ export const createResume = asyncHandler(async (req, res) => {
     const { title, summary, skills, isDefault } = req.body;
     if (!title) {
         throw new ApiError(400, 'Please provide a resume title');
+    }
+
+    const trimmedTitle = title.trim();
+
+    // Hash the file so we can catch true duplicate uploads (same file,
+    // different title) as well as duplicate titles.
+    const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+    // Detects duplicate attempts immediate 409 without
+    // ever touching Cloudinary.
+    const existing = await Resume.findOne({
+        user: req.user._id,
+        $or: [{ title: trimmedTitle }, { fileHash }],
+    });
+
+    if (existing) {
+        const reason =
+            existing.fileHash === fileHash
+                ? 'You have already uploaded this exact resume file.'
+                : 'You already have a resume with this title.';
+        throw new ApiError(409, reason);
     }
 
     const uploadResult = await uploadToCloudinary(req.file.buffer);
@@ -49,16 +71,18 @@ export const createResume = asyncHandler(async (req, res) => {
 
         resume = await Resume.create({
             user: req.user._id,
-            title,
+            title: trimmedTitle,
             fileUrl: uploadResult.secure_url,
             fileName: req.file.originalname,
             fileType,
+            fileHash,
             isDefault: existingCount === 0 ? true : (isDefault === 'true' || isDefault === true),
             summary,
             skills: skills ? skills.split(',').map((s) => s.trim()) : [],
         });
     } catch (error) {
         // Clean up Cloudinary asset if Mongoose document creation fails
+        // (including a duplicate-key race — see the 11000 handling below).
         if (uploadResult && uploadResult.public_id) {
             await cloudinary.uploader.destroy(uploadResult.public_id, { resource_type: 'raw' });
         } else if (uploadResult && uploadResult.secure_url) {
@@ -67,12 +91,24 @@ export const createResume = asyncHandler(async (req, res) => {
                 await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
             }
         }
+
+        // Two near-simultaneous requests can both pass the findOne check
+        // above before either document exists. The unique index on the
+        // schema (see resume.model.js) is the real guard against that race;
+        // this just turns Mongo's raw duplicate-key error into a clean 409
+        // instead of leaking a 500.
+        if (error.code === 11000) {
+            const dupField = Object.keys(error.keyPattern || {}).includes('fileHash')
+                ? 'You have already uploaded this exact resume file.'
+                : 'You already have a resume with this title.';
+            throw new ApiError(409, dupField);
+        }
+
         throw error;
     }
 
     res.status(201).json({ success: true, resume });
 });
-
 // @route   GET /api/resumes/my
 // @access  Job Seeker only
 export const getMyResumes = asyncHandler(async (req, res) => {

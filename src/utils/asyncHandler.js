@@ -1,5 +1,3 @@
-// utils/asyncHandler.js
-
 // Wraps an async controller function, catching any rejected promise
 // and forwarding the error to Express's error-handling middleware via next()
 const asyncHandler = (fn) => {

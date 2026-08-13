@@ -9,6 +9,7 @@ const ResumeSchema = new mongoose.Schema({
     fileUrl: { type: String, required: [true, 'Please upload a resume file'] },
     fileName: { type: String, required: true },
     fileType: { type: String, enum: ['pdf', 'doc', 'docx'], required: true },
+    fileHash: { type: String, required: true },
 
     isDefault: { type: Boolean, default: false },
     // which resume gets auto-selected when applying, if the seeker doesn't pick one
@@ -36,6 +37,12 @@ const ResumeSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 ResumeSchema.index({ user: 1 });
+
+// Enforce "no duplicate resume submission" at the database level — this is
+// the real guard against the race condition where two requests both pass
+// the controller's findOne pre-check before either document exists.
+ResumeSchema.index({ user: 1, title: 1 }, { unique: true });
+ResumeSchema.index({ user: 1, fileHash: 1 }, { unique: true });
 
 const Resume = mongoose.model('Resume', ResumeSchema);
 export default Resume;

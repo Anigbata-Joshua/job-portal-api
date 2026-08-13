@@ -3,50 +3,46 @@ import { env } from './config/env.js';
 import { connectDatabase, closeDatabase } from './config/db.js';
 import User from './models/user.model.js';
 
+// Test users to seed. Passwords must satisfy the model's password
+// validator: at least one uppercase letter, one digit, and one
+// special character.
+const testUsers = [
+    {
+        name: 'Test Job Seeker',
+        email: 'test@example.com',
+        password: 'Test123456!',
+        role: 'job_seeker',
+    },
+    {
+        name: 'Test Employer',
+        email: 'employer@example.com',
+        password: 'Test123456!',
+        role: 'job_seeker', // Will be upgraded to 'employer' when they create a company
+    },
+];
+
 async function seedDatabase() {
     try {
         await connectDatabase();
 
         console.log('🌱 Seeding database...');
 
-        // Check if users already exist
-        const userCount = await User.countDocuments();
-        if (userCount > 0) {
-            console.log(`📊 Database already has ${userCount} users.`);
-            console.log('✅ To view your data, go to MongoDB Atlas → Browse Collections');
-            await closeDatabase();
-            return;
+        for (const userData of testUsers) {
+            const existing = await User.findOne({ email: userData.email });
+
+            if (existing) {
+                console.log(`⏭️  Skipped ${userData.email} — already exists (ID: ${existing._id})`);
+                continue;
+            }
+
+            const user = await User.create(userData);
+            console.log(`✅ Created ${user.role}:`);
+            console.log(`   ID: ${user._id}`);
+            console.log(`   Name: ${user.name}`);
+            console.log(`   Email: ${user.email}`);
         }
 
-        // Create a test user
-        const testUser = await User.create({
-            name: 'Test Job Seeker',
-            email: 'test@example.com',
-            password: 'Test123456',
-            role: 'job_seeker',
-        });
-
-        console.log('✅ Test user created successfully:');
-        console.log(`   ID: ${testUser._id}`);
-        console.log(`   Name: ${testUser.name}`);
-        console.log(`   Email: ${testUser.email}`);
-        console.log(`   Role: ${testUser.role}`);
-
-        // Create a second user (employer)
-        const employer = await User.create({
-            name: 'Test Employer',
-            email: 'employer@example.com',
-            password: 'Test123456',
-            role: 'job_seeker', // Will be upgraded when they create a company
-        });
-
-        console.log('✅ Employer user created successfully:');
-        console.log(`   ID: ${employer._id}`);
-        console.log(`   Name: ${employer.name}`);
-        console.log(`   Email: ${employer.email}`);
-        console.log(`   Role: ${employer.role}`);
-
-        console.log('\n📊 Database seeded successfully!');
+        console.log('\n📊 Seeding complete!');
         console.log('🔗 Go to MongoDB Atlas → Browse Collections to see your data');
 
         await closeDatabase();
