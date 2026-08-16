@@ -14,10 +14,17 @@ export const getSeekerReport = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 
     // 1. Applications breakdown
-    const applicationsBreakdown = await JobApplication.aggregate([
+    const applicationsBreakdownRaw = await JobApplication.aggregate([
         { $match: { applicant: userId } },
         { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
+    // Rename the aggregation's grouping key (_id) to something meaningful
+    // for API consumers — "status" reads far more clearly than "_id",
+    // which normally implies a document ID rather than a grouped value.
+    const applicationsBreakdown = applicationsBreakdownRaw.map((item) => ({
+        status: item._id,
+        count: item.count,
+    }));
 
     const totalApplications = applicationsBreakdown.reduce((sum, item) => sum + item.count, 0);
 
@@ -56,10 +63,14 @@ export const getEmployerReport = asyncHandler(async (req, res) => {
     const jobsCount = await Job.countDocuments({ company: companyId });
 
     // 2. Get applications breakdown for all jobs posted by the company
-    const applicationsBreakdown = await JobApplication.aggregate([
+    const applicationsBreakdownRaw = await JobApplication.aggregate([
         { $match: { company: companyId } },
         { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
+    const applicationsBreakdown = applicationsBreakdownRaw.map((item) => ({
+        status: item._id,
+        count: item.count,
+    }));
 
     const totalApplications = applicationsBreakdown.reduce((sum, item) => sum + item.count, 0);
 
@@ -86,23 +97,29 @@ export const getEmployerReport = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 export const getAdminReport = asyncHandler(async (req, res) => {
     // 1. Total users by role
-    const usersByRole = await User.aggregate([
+    const usersByRoleRaw = await User.aggregate([
         { $group: { _id: '$role', count: { $sum: 1 } } }
     ]);
+    const usersByRole = usersByRoleRaw.map((item) => ({ role: item._id, count: item.count }));
 
     const totalUsers = usersByRole.reduce((sum, item) => sum + item.count, 0);
 
     // 2. Total companies & verification status
-    const companiesVerification = await Company.aggregate([
+    const companiesVerificationRaw = await Company.aggregate([
         { $group: { _id: '$isVerified', count: { $sum: 1 } } }
     ]);
+    const companiesVerification = companiesVerificationRaw.map((item) => ({
+        isVerified: item._id,
+        count: item.count,
+    }));
 
     const totalCompanies = companiesVerification.reduce((sum, item) => sum + item.count, 0);
 
     // 3. Total jobs count by status
-    const jobsByStatus = await Job.aggregate([
+    const jobsByStatusRaw = await Job.aggregate([
         { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
+    const jobsByStatus = jobsByStatusRaw.map((item) => ({ status: item._id, count: item.count }));
 
     const totalJobs = jobsByStatus.reduce((sum, item) => sum + item.count, 0);
 

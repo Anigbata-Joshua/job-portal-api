@@ -9,12 +9,12 @@ const required = (key, fallback = undefined) => {
 };
 
 export const env = {
-    
+
     //Server
     nodeEnv: process.env.NODE_ENV || "development",
     isProduction: process.env.NODE_ENV === "production",
     port: parseInt(process.env.PORT || "5000", 10),
-    
+
     //Cloudinary
     cloudinaryCloudName: required("CLOUDINARY_CLOUD_NAME"),
     cloudinaryApiKey: required("CLOUDINARY_API_KEY"),
@@ -37,6 +37,8 @@ export const env = {
     jwtRefreshSecret: required("JWT_REFRESH_SECRET"),
     jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRATION || "7d",
 
+    // Rate limiter
     rateLimit: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
     rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    generalRateLimitMax: parseInt(process.env.GENERAL_RATE_LIMIT_MAX || '300', 10),
 }
