@@ -1,76 +1,101 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
-describe('Job Application Concurrency Tests', () => {
+// Mock asyncHandler as a simple pass-through to let tests directly await the controller
+vi.mock('../src/utils/asyncHandler.js', () => {
+    return {
+        default: (fn) => fn
+    };
+});
 
-    it('VULNERABILITY DEMONSTRATION: Concurrency race condition causes lost counter updates', async () => {
-        // Mock DB Job Document
-        let jobDocument = {
-            _id: 'job-1',
-            applicationsCount: 0
-        };
+vi.mock('../src/utils/createNotification.js', () => ({
+    default: vi.fn(),
+}));
 
-        // Simulates the vulnerable endpoint controller behavior
-        // Read job -> increment counter -> write job
-        const applyToJobVulnerable = async () => {
-            // Step 1: Read current job count (simulating Mongo findById)
-            const countBefore = jobDocument.applicationsCount;
-            
-            // Simulate network/execution delay (I/O) before writing back
-            await new Promise(resolve => setTimeout(resolve, Math.random() * 10));
-            
-            // Step 2: Increment and write back (simulating job.save())
-            jobDocument.applicationsCount = countBefore + 1;
-        };
+import { applyToJob } from '../src/controllers/jobApplication.controller.js';
+import Job from '../src/models/job.model.js';
+import JobApplication from '../src/models/job-application.model.js';
+import Resume from '../src/models/resume.model.js';
 
-        // Simulate 10 concurrent requests to apply to the job
-        await Promise.all([
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable(),
-            applyToJobVulnerable()
-        ]);
+vi.mock('../src/models/job.model.js');
+vi.mock('../src/models/job-application.model.js');
+vi.mock('../src/models/resume.model.js');
 
-        // Expectation: The count should be 10, but because of race conditions and dirty reads,
-        // it will almost certainly be less than 10.
-        expect(jobDocument.applicationsCount).toBeLessThan(10);
-        console.log(`VULNERABLE COUNT RESULT (Should be 10, actually is): ${jobDocument.applicationsCount}`);
+const buildRes = () => {
+    const res = {
+        status: (code) => {
+            res.statusCode = code;
+            return res;
+        },
+        json: (data) => {
+            res.body = data;
+            return res;
+        },
+    };
+    return res;
+};
+
+describe('Job Application Concurrency Safety', () => {
+
+    it('applyToJob increments applicationsCount using an atomic $inc, not a read-modify-write', async () => {
+        // In-memory "job document" — starts at 0 applications.
+        const jobDocument = { _id: 'job-1', status: 'open', company: 'company-1', applicationsCount: 0 };
+
+        Job.findById = vi.fn().mockResolvedValue(jobDocument);
+        Resume.findById = vi.fn().mockResolvedValue({ _id: 'resume-1', user: { equals: () => true } });
+        JobApplication.findOne = vi.fn().mockResolvedValue(null); // no existing application
+        JobApplication.create = vi.fn().mockResolvedValue({ _id: 'app-1' });
+
+        // The real fix for the race condition: Job.findByIdAndUpdate with $inc
+        // is what actually serializes the increment on the database side.
+        // Here we simulate MongoDB's atomic behavior faithfully — each call
+        // to $inc applies in sequence, regardless of read timing — and
+        // assert the controller actually calls it this way, not via
+        // "read applicationsCount, add 1 in JS, write it back".
+        Job.findByIdAndUpdate = vi.fn().mockImplementation(async (id, update) => {
+            if (update?.$inc?.applicationsCount) {
+                jobDocument.applicationsCount += update.$inc.applicationsCount;
+            }
+            return jobDocument;
+        });
+
+        const makeReq = (userId) => ({
+            body: { jobId: 'job-1', resumeId: 'resume-1', coverLetter: 'test' },
+            user: { _id: userId },
+        });
+
+        // Simulate 10 concurrent applications from 10 different seekers.
+        await Promise.all(
+            Array.from({ length: 10 }, (_, i) => applyToJob(makeReq(`seeker-${i}`), buildRes()))
+        );
+
+        // Because the controller uses $inc (an atomic DB-side operation)
+        // rather than reading applicationsCount into JS and writing it back,
+        // all 10 increments are correctly applied — no lost updates.
+        expect(jobDocument.applicationsCount).toBe(10);
+
+        // Confirm the controller actually used the atomic pattern, not a
+        // manual job.applicationsCount++ / job.save() — this is what makes
+        // the test a real guard against the race condition regressing.
+        expect(Job.findByIdAndUpdate).toHaveBeenCalledTimes(10);
+        Job.findByIdAndUpdate.mock.calls.forEach((call) => {
+            expect(call[1]).toEqual({ $inc: { applicationsCount: 1 } });
+        });
     });
 
-    it('SECURE REMEDY: Atomic database operations prevent lost updates', async () => {
-        let jobDocument = {
-            _id: 'job-1',
-            applicationsCount: 0
+    it('VULNERABILITY REFERENCE: a naive read-modify-write pattern would lose updates under the same load', async () => {
+        // Kept as a standalone conceptual reference for why $inc matters —
+        // this does NOT call the real controller, it just documents the
+        // failure mode the fix above protects against.
+        let counter = 0;
+
+        const naiveIncrement = async () => {
+            const before = counter;
+            await new Promise((resolve) => setTimeout(resolve, Math.random() * 10));
+            counter = before + 1;
         };
 
-        // Mocking atomic MongoDB $inc command behavior
-        const atomicIncJobCount = async () => {
-            // In MongoDB: Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: 1 } })
-            // This is handled atomically inside the database engine.
-            // We simulate database serialization of updates:
-            jobDocument.applicationsCount += 1;
-        };
+        await Promise.all(Array.from({ length: 10 }, () => naiveIncrement()));
 
-        // Run 10 concurrent requests using the atomic update method
-        await Promise.all([
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount(),
-            atomicIncJobCount()
-        ]);
-
-        // Expectation: Atomic operations always serialize updates correctly
-        expect(jobDocument.applicationsCount).toBe(10);
+        expect(counter).toBeLessThan(10);
     });
 });

@@ -25,12 +25,21 @@ vi.mock('../src/models/job.model.js');
 describe('Reports & Analytics Controller Tests', () => {
 
     it('getSeekerReport should return correct aggregation results for seeker', async () => {
-        const mockApplicationsBreakdown = [
+        // This is what MongoDB's raw $group aggregation actually returns —
+        // the controller is responsible for renaming '_id' before sending
+        // the response, so the mock stays in the raw shape here.
+        const mockRawAggregation = [
             { _id: 'applied', count: 3 },
             { _id: 'interview', count: 1 }
         ];
+        // This is what the controller should produce after its rename step —
+        // this is what the actual API response is expected to contain.
+        const expectedApplicationsBreakdown = [
+            { status: 'applied', count: 3 },
+            { status: 'interview', count: 1 }
+        ];
 
-        JobApplication.aggregate = vi.fn().mockResolvedValue(mockApplicationsBreakdown);
+        JobApplication.aggregate = vi.fn().mockResolvedValue(mockRawAggregation);
         Interview.countDocuments = vi.fn().mockResolvedValue(1);
         SavedJob.countDocuments = vi.fn().mockResolvedValue(4);
 
@@ -59,7 +68,7 @@ describe('Reports & Analytics Controller Tests', () => {
         expect(responseJson.data.totalApplications).toBe(4);
         expect(responseJson.data.upcomingInterviews).toBe(1);
         expect(responseJson.data.savedJobsCount).toBe(4);
-        expect(responseJson.data.applicationsBreakdown).toEqual(mockApplicationsBreakdown);
+        expect(responseJson.data.applicationsBreakdown).toEqual(expectedApplicationsBreakdown);
     });
 
     it('getEmployerReport should throw error if employer is not associated with a company', async () => {
