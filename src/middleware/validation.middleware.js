@@ -8,7 +8,7 @@ export const validate = (schema) => (req, res, next) => {
         next();
     } catch (err) {
         if (err instanceof z.ZodError) {
-            const errorMessages = err.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+            const errorMessages = err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
             return next(new ApiError(400, errorMessages));
         }
         next(err);
@@ -48,6 +48,22 @@ export const createCompanySchema = z.object({
     logo: z.string().url('Invalid logo URL').nullable().optional().or(z.literal('')),
 });
 
+// PATCH semantics — every field optional, since a partial update should
+// only touch whatever the client actually sends.
+export const updateCompanySchema = z.object({
+    name: z.string().min(1, 'Company name cannot be empty').optional(),
+    description: z.string().min(10, 'Description must be at least 10 characters').optional(),
+    website: z.string().url('Please enter a valid website URL').nullable().optional().or(z.literal('')),
+    industry: z.string().min(1, 'Industry cannot be empty').optional(),
+    size: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']).optional(),
+    logo: z.string().url('Invalid logo URL').nullable().optional().or(z.literal('')),
+});
+
+// addRecruiter only ever needs a valid user ID to invite.
+export const addRecruiterSchema = z.object({
+    userId: objectIdSchema,
+});
+
 export const createJobSchema = z.object({
     title: z.string().min(1, 'Job title is required'),
     description: z.string().min(10, 'Job description must be at least 10 characters'),
@@ -75,26 +91,4 @@ export const scheduleInterviewSchema = z.object({
     location: z.string().min(1, 'Location or link is required'),
     round: z.enum(['screening', 'technical', 'hr', 'final']).optional(),
     interviewers: z.array(objectIdSchema).optional(),
-});
-
-export const applyToJobSchema = z.object({
-    jobId: objectIdSchema,
-    resumeId: objectIdSchema,
-    coverLetter: z.string().max(2000, 'Cover letter is too long').optional(),
-});
-
-export const updateApplicationStatusSchema = z.object({
-    status: z.enum(['applied', 'under_review', 'shortlisted', 'interview', 'offered', 'rejected', 'withdrawn']),
-    note: z.string().max(500, 'Note is too long').optional(),
-});
-
-export const saveJobSchema = z.object({
-    jobId: objectIdSchema,
-});
-
-export const createResumeSchema = z.object({
-    title: z.string().min(1, 'Resume title is required'),
-    summary: z.string().max(1000, 'Summary is too long').optional(),
-    skills: z.string().optional(), // comma-separated string from form-data, not an array
-    isDefault: z.string().optional(), // form-data sends booleans as strings ("true"/"false")
 });
