@@ -5,7 +5,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import { env } from '../config/env.js';
 import generateTokens from '../utils/generateTokens.js';
-import { parseCookies, setTokenCookies, clearTokenCookies, getRefreshToken } from '../utils/cookie.js';
+import { setTokenCookies, clearTokenCookies, getRefreshToken } from '../utils/cookie.js';   
 
 // @route   POST /api/auth/register
 export const register = asyncHandler(async (req, res) => {
