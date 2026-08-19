@@ -3,18 +3,7 @@ import User from '../models/user.model.js';
 import { env } from '../config/env.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
-
-const parseCookies = (cookieHeader) => {
-    const list = {};
-
-    if (!cookieHeader) return list;
-
-    cookieHeader.split(';').forEach((cookie) => {
-        const parts = cookie.split('=');
-        list[parts.shift().trim()] = decodeURI(parts.join('='));
-    });
-    return list;
-};
+import { parseCookies } from '../utils/cookie.js';
 
 // Verifies the JWT access token and attaches the user to req.user
 export const authenticate = asyncHandler(async (req, res, next) => {

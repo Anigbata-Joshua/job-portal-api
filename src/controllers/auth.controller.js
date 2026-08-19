@@ -5,33 +5,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import { env } from '../config/env.js';
 import generateTokens from '../utils/generateTokens.js';
-
-// Helper to parse cookies manually
-const parseCookies = (cookieHeader) => {
-    const list = {};
-    if (!cookieHeader) return list;
-    cookieHeader.split(';').forEach((cookie) => {
-        const parts = cookie.split('=');
-        list[parts.shift().trim()] = decodeURI(parts.join('='));
-    });
-    return list;
-};
-
-// Helper to set HttpOnly cookies on response
-const setTokenCookies = (res, accessToken, refreshToken) => {
-    res.cookie('accessToken', accessToken, {
-        httpOnly: true,
-        secure: env.isProduction,
-        sameSite: 'strict',
-        maxAge: 45 * 60 * 1000, // 45 minutes
-    });
-    res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: env.isProduction,
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-};
+import { parseCookies, setTokenCookies, clearTokenCookies, getRefreshToken } from '../utils/cookie.js';
 
 // @route   POST /api/auth/register
 export const register = asyncHandler(async (req, res) => {
@@ -101,15 +75,7 @@ export const login = asyncHandler(async (req, res) => {
 
 // @route   POST /api/auth/refresh
 export const refreshAccessToken = asyncHandler(async (req, res) => {
-    let token = null;
-
-    if (req.headers.cookie) {
-        const cookies = parseCookies(req.headers.cookie);
-        token = cookies.refreshToken;
-    }
-    if (!token) {
-        token = req.body.refreshToken;
-    }
+    const token = getRefreshToken(req);
 
     if (!token) {
         throw new ApiError(401, 'Refresh token required');
@@ -133,8 +99,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
     if (user.refreshToken !== token) {
         user.refreshToken = null; // Clear active token to force login from all devices
         await user.save();
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
+        clearTokenCookies(res);
         throw new ApiError(401, 'Potential token reuse detected. Access revoked. Please log in again.');
     }
 
@@ -155,15 +120,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
 
 // @route   POST /api/auth/logout
 export const logout = asyncHandler(async (req, res) => {
-    let token = null;
-
-    if (req.headers.cookie) {
-        const cookies = parseCookies(req.headers.cookie);
-        token = cookies.refreshToken;
-    }
-    if (!token) {
-        token = req.body.refreshToken;
-    }
+    const token = getRefreshToken(req);
 
     if (token) {
         try {
@@ -178,8 +135,7 @@ export const logout = asyncHandler(async (req, res) => {
         }
     }
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    clearTokenCookies(res);
 
     res.status(200).json({
         success: true,

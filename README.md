@@ -108,22 +108,61 @@ npm run test
 
 ## 📂 API Endpoint Routes
 
-### Authentication
-- `POST /api/auth/register` - Create Seeker/Employer profile
-- `POST /api/auth/login` - Authenticate & receive HttpOnly cookies
-- `POST /api/reports/seeker` - Analytics for Job Seeker (Seeker role)
-- `POST /api/reports/employer` - Analytics for Company (Employer/Recruiter roles)
-- `POST /api/reports/admin` - Platform-wide stats (Admin role)
-- `POST /api/auth/refresh` - Rotate tokens
-- `POST /api/auth/logout` - Clear active session tokens
+### 🔑 Authentication (`/api/auth`)
+- `POST /api/auth/register` - Create Seeker or Employer profile.
+- `POST /api/auth/login` - Authenticate, log in & receive HttpOnly cookies.
+- `POST /api/auth/refresh` - Rotate access/refresh tokens securely.
+- `POST /api/auth/logout` - Invalidate tokens & clear active cookies.
 
-### Job Management
-- `POST /api/jobs` - Post a new job (Employer/Recruiter)
-- `GET /api/jobs` - Public job listing feed with queries
-- `GET /api/jobs/:id` - Public job detail retrieval
-- `PATCH /api/jobs/:id` - Edit listing (Owner only)
+### 🏢 Company Profiles (`/api/companies`)
+- `POST /api/companies` - Register a new company profile (upgrades candidate to Employer).
+- `GET /api/companies/:id` - Fetch public company profile information.
+- `PATCH /api/companies/:id` - Update company details (owner check).
+- `POST /api/companies/:id/recruiters` - Associate a new Recruiter/Employer to the company.
 
-### Applications & Interviews
-- `POST /api/applications` - Seeker applies for a job
-- `POST /api/interviews` - Schedule interview with double-booking checks
-- `PATCH /api/saved-jobs` - Save listing to candidate dashboard
+### 💼 Job Management (`/api/jobs`)
+- `POST /api/jobs` - Post a new job (Employer/Recruiter only).
+- `GET /api/jobs` - Search and query job listings feed (public).
+- `GET /api/jobs/:id` - Retrieve details of a single job post.
+- `PATCH /api/jobs/:id` - Edit listing details (owner only).
+- `DELETE /api/jobs/:id` - Remove a job listing (owner only).
+
+### 📝 Job Applications (`/api/applications`)
+- `POST /api/applications` - Apply to an open job listing (Job Seeker only).
+- `GET /api/applications/my` - Fetch candidate's own application history (Job Seeker only).
+- `PATCH /api/applications/:id/withdraw` - Withdraw a job application (Job Seeker only).
+- `GET /api/applications/job/:jobId` - Fetch all applications for a job listing (Employer/Recruiter only).
+- `PATCH /api/applications/:id/status` - Update application status (Employer/Recruiter only).
+
+### 🗓️ Interview Scheduling (`/api/interviews`)
+- `POST /api/interviews` - Schedule a candidate interview with transactional safety & double-booking checks (Employer/Recruiter only).
+- `GET /api/interviews/company` - Fetch company's scheduled interviews (Employer/Recruiter only).
+- `GET /api/interviews/my` - Fetch candidate's scheduled interviews (Job Seeker only).
+- `PATCH /api/interviews/:id/status` - Update interview schedule status (Employer/Recruiter only).
+- `PATCH /api/interviews/:id/feedback` - Submit/log recruiter feedback and scores (Employer/Recruiter only).
+
+### 🔖 Saved Jobs (`/api/saved-jobs`)
+- `POST /api/saved-jobs` - Save a job listing to candidate bookmarks (Job Seeker only).
+- `GET /api/saved-jobs` - Fetch all bookmarked job listings (Job Seeker only).
+- `DELETE /api/saved-jobs/:jobId` - Remove job listing from bookmarks (Job Seeker only).
+
+### 📄 Resume Management (`/api/resumes`)
+- `POST /api/resumes` - Upload a resume document (Job Seeker only, Cloudinary upload).
+- `GET /api/resumes/my` - List all uploaded resumes for the candidate (Job Seeker only).
+- `PATCH /api/resumes/:id/default` - Set a primary default resume (Job Seeker only).
+- `DELETE /api/resumes/:id` - Remove an uploaded resume (Job Seeker only).
+
+### 🔔 Notifications (`/api/notifications`)
+- `GET /api/notifications` - Retrieve list of notifications (Authenticated users).
+- `PATCH /api/notifications/:id/read` - Mark a specific notification as read.
+- `PATCH /api/notifications/read-all` - Mark all notifications as read.
+- `DELETE /api/notifications/:id` - Dismiss/delete a notification.
+
+### 📊 Reports & Analytics (`/api/reports`)
+- `GET /api/reports/seeker` - Aggregated metrics for candidates (Job Seeker only).
+- `GET /api/reports/employer` - Recruitment pipeline analytics (Employer/Recruiter only).
+- `GET /api/reports/admin` - Platform-wide statistics (Admin only).
+
+### 🛡️ Admin Console (`/api/admin`)
+- `GET /api/admin/companies/pending` - Fetch pending company verification profiles (Admin only).
+- `PATCH /api/admin/companies/:id/verify` - Approve/verify a company profile (Admin only).
